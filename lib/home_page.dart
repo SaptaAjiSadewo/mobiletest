@@ -1,154 +1,163 @@
 import 'package:flutter/material.dart';
+import 'kupondiskon_page.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
+  final String name;
+
+  const HomePage({super.key, required this.name});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  int _selectedIndex = 0;
+
+  final List<Map<String, String>> kuponList = [
+    {
+      "title": "DISKON 30%",
+      "desc": "Aughment treatment",
+      "date": "22 Februari 2025"
+    },
+    {"title": "DISKON 50%", "desc": "Shoes treatment", "date": "5 Maret 2025"},
+    {"title": "DISKON 15%", "desc": "Bag treatment", "date": "15 Maret 2025"},
+    {"title": "DISKON 10%", "desc": "Carpet treatment", "date": "1 April 2025"},
+    {"title": "DISKON 20%", "desc": "Jacket treatment", "date": "10 Mei 2025"},
+  ];
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+
+    if (index == 1) {
+      Navigator.push(
+          context, MaterialPageRoute(builder: (context) => KuponDiskonPage()));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    String name = widget.name; // Tetap menggunakan variabel ini untuk header
+
     return Scaffold(
-      backgroundColor: Colors.grey[200],
       appBar: AppBar(
+        title: Text("Home"),
         backgroundColor: Colors.white,
         elevation: 0,
-        title: Text(
-          'Beranda',
-          style: TextStyle(
-              fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
-        ),
         actions: [
           IconButton(
-            icon: Icon(Icons.exit_to_app, color: Colors.black),
+            icon: Icon(Icons.logout, color: Colors.black),
             onPressed: () {
-              _logout(context);
+              Navigator.pushReplacementNamed(context, "/");
             },
+          ),
+          IconButton(
+            icon: Icon(Icons.notifications, color: Colors.black),
+            onPressed: () {},
           ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5)],
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header Ucapan (TETAP SESUAI PERMINTAAN)
+              Text(
+                "Halo, $name!",
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-              padding: EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  Image.asset('assets/banner.png', fit: BoxFit.cover),
-                ],
-              ),
-            ),
-            SizedBox(height: 10),
-            Text(
-              "Halo Mamas!",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 10),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5)],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Icon(Icons.percent, size: 40),
-                        Text("Kupon/diskon"),
-                      ],
-                    ),
+              SizedBox(height: 10),
+
+              // Banner Promo
+              Container(
+                width: double.infinity,
+                height: 150,
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.circular(10),
+                  image: DecorationImage(
+                    image: AssetImage('assets/banner.png'),
+                    fit: BoxFit.cover,
                   ),
-                  Container(height: 60, width: 1, color: Colors.grey),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Icon(Icons.campaign, size: 40),
-                        Text("Promosi"),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 15),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("Kupon",
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Text("Lihat semua", style: TextStyle(color: Colors.blue)),
-              ],
-            ),
-            SizedBox(height: 10),
-            _buildKupon("DISKON 30%", "Aughment treatment", "22 Februari 2025"),
-            _buildKupon("DISKON 50%", "Shoes treatment", "5 Maret 2025"),
-            _buildKupon("DISKON 15%", "Bag treatment", "15 Maret 2025"),
-            SizedBox(height: 20),
-            Center(
-              child: ElevatedButton(
-                onPressed: () {
-                  _logout(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
                 ),
-                child: Text("Keluar"),
               ),
-            ),
-          ],
+              SizedBox(height: 20),
+
+              // Menu Kupon & Promosi
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  menuItem(Icons.local_offer, "Kupon/diskon"),
+                  menuItem(Icons.campaign, "Promosi"),
+                ],
+              ),
+              SizedBox(height: 20),
+
+              // List Kupon
+              Text("Kupon",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              SizedBox(height: 10),
+
+              ListView.builder(
+                shrinkWrap: true,
+                physics: NeverScrollableScrollPhysics(),
+                itemCount: kuponList.length,
+                itemBuilder: (context, index) {
+                  final kupon = kuponList[index];
+                  return kuponItem(
+                      kupon['title']!, kupon['desc']!, kupon['date']!);
+                },
+              ),
+            ],
+          ),
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
+        currentIndex: _selectedIndex,
         selectedItemColor: Colors.black,
-        unselectedItemColor: Colors.black54,
+        unselectedItemColor: Colors.grey,
+        onTap: _onItemTapped,
         items: [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: ""),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
           BottomNavigationBarItem(
-              icon: Icon(Icons.confirmation_number), label: ""),
-          BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: ""),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: ""),
+              icon: Icon(Icons.local_offer), label: "Kupon"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.shopping_cart), label: "Keranjang"),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profil"),
         ],
       ),
     );
   }
 
-  void _logout(BuildContext context) {
-    Navigator.pushReplacementNamed(context, '/');
+  Widget menuItem(IconData icon, String title) {
+    return Column(
+      children: [
+        Icon(icon, size: 40, color: Colors.black),
+        SizedBox(height: 5),
+        Text(title, style: TextStyle(fontWeight: FontWeight.bold)),
+      ],
+    );
   }
 
-  Widget _buildKupon(String title, String subtitle, String date) {
-    return Container(
+  Widget kuponItem(String title, String desc, String date) {
+    return Card(
       margin: EdgeInsets.symmetric(vertical: 5),
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5)],
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.percent, size: 30),
-          SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title,
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              Text(subtitle,
-                  style: TextStyle(fontSize: 14, color: Colors.grey)),
-              Text("Berlaku s/d $date",
-                  style: TextStyle(fontSize: 12, color: Colors.grey)),
-            ],
-          ),
-        ],
+      child: ListTile(
+        leading: Icon(Icons.local_offer, color: Colors.black),
+        title: Text(title, style: TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(desc, softWrap: true),
+            Text("Berlaku s/d $date",
+                style: TextStyle(fontSize: 12, color: Colors.grey)),
+          ],
+        ),
+        isThreeLine: true,
       ),
     );
   }
