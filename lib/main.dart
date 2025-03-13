@@ -1,23 +1,27 @@
 import 'package:flutter/material.dart';
-import 'login_page.dart'; // Impor halaman login
-import 'home_page.dart'; // Impor halaman beranda
+import 'login_page.dart';
+import 'register_page.dart';
 
 void main() {
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      initialRoute: '/', // Halaman pertama yang ditampilkan
+      title: 'Flutter Auth',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      initialRoute: '/',
       routes: {
         '/': (context) => LoginPage(),
-        '/home': (context) => HomePage(),
+        '/register': (context) => RegisterPage(),
       },
     );
   }
 }
-
-
