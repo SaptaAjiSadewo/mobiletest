@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_project_test/pesanan_page.dart';
 import 'kupondiskon_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -29,11 +30,44 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _selectedIndex = index;
     });
-
-    if (index == 1) {
+    if (index == 0) {
+      // ✅ Tetap di halaman Home
+    } else if (index == 1) {
       Navigator.push(
           context, MaterialPageRoute(builder: (context) => KuponDiskonPage()));
+    } else if (index == 2) {
+      // ✅ Pindah ke halaman Keranjang (PesananPage)
+      Navigator.push(
+          context, MaterialPageRoute(builder: (context) => BuatPesananPage()));
     }
+  }
+
+  /// ✅ Pindahkan fungsi ini keluar dari `onPressed`
+  void _showLogoutConfirmationDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Konfirmasi Logout"),
+          content: Text("Apakah Anda yakin ingin keluar?"),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // ✅ Tutup dialog tanpa logout
+              },
+              child: Text("Tidak", style: TextStyle(color: Colors.grey)),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // ✅ Tutup dialog
+                Navigator.pushReplacementNamed(context, "/"); // ✅ Logout
+              },
+              child: Text("Ya", style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -49,7 +83,7 @@ class _HomePageState extends State<HomePage> {
           IconButton(
             icon: Icon(Icons.logout, color: Colors.black),
             onPressed: () {
-              Navigator.pushReplacementNamed(context, "/");
+              _showLogoutConfirmationDialog(context); // ✅ Tidak error lagi
             },
           ),
           IconButton(
