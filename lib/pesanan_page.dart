@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'checkout_page.dart';
 
 class BuatPesananPage extends StatefulWidget {
   @override
@@ -6,41 +9,63 @@ class BuatPesananPage extends StatefulWidget {
 }
 
 class _BuatPesananPageState extends State<BuatPesananPage> {
+  List<dynamic> layananList = [];
+  Map<String, List<int>> layananGrouped =
+      {}; // Menyimpan harga berdasarkan nama layanan
   Map<String, int> layananDipilih = {};
-  Map<String, int> hargaLayanan = {
-    "Quick clean (5 jam)": 20000,
-    "Deep clean (3 hari)": 40000,
-    "Leather care/perawatan sepatu kulit (3 hari)": 55000,
-    "Kids shoes cleaning (2 hari)": 20000,
-    "Women shoes (2 hari)": 25000,
-    "Unyellowing midsole (4 hari)": 65000,
-    "Cap cleaning (2 hari)": 20000,
-    "Sandals cleaning (2 hari)": 85000,
-  };
+  Map<String, int?> hargaDipilih = {}; // Menyimpan harga yang dipilih pengguna
 
-  Map<String, bool> kategoriTerbuka = {
-    "SHOES TREATMENT": true,
-    "AUGMENT": true,
-  };
+  @override
+  void initState() {
+    super.initState();
+    fetchLayanan();
+  }
+
+  Future<void> fetchLayanan() async {
+    try {
+      final response =
+          await http.get(Uri.parse("http://kien api e ira:8000/api/get_layanan"));
+      if (response.statusCode == 200) {
+        List<dynamic> data = json.decode(response.body);
+        setState(() {
+          layananList = data; // Perbaikan utama: layananList harus diisi
+          layananGrouped.clear();
+          for (var layanan in data) {
+            String nama = layanan["nama"];
+            int harga = layanan["harga"];
+            layananGrouped.putIfAbsent(nama, () => []).add(harga);
+          }
+        });
+      }
+    } catch (e) {
+      print("Error fetching layanan: $e");
+    }
+  }
 
   int hitungTotalHarga() {
     int total = 0;
     layananDipilih.forEach((key, value) {
-      total += (hargaLayanan[key] ?? 0) * value;
+      final harga = hargaDipilih[key] ?? 0; // Gunakan harga yang dipilih
+      total += harga * value;
     });
     return total;
   }
 
   void tambahLayanan(String layanan) {
     setState(() {
-      layananDipilih[layanan] = (layananDipilih[layanan] ?? 0) + 1;
+      if (hargaDipilih[layanan] != null) {
+        // Pastikan harga telah dipilih
+        layananDipilih[layanan] = (layananDipilih[layanan] ?? 0) + 1;
+      }
     });
   }
 
   void kurangiLayanan(String layanan) {
     setState(() {
-      if (layananDipilih[layanan] != null && layananDipilih[layanan]! > 0) {
+      if (layananDipilih.containsKey(layanan) && layananDipilih[layanan]! > 1) {
         layananDipilih[layanan] = layananDipilih[layanan]! - 1;
+      } else {
+        layananDipilih.remove(layanan);
       }
     });
   }
@@ -48,152 +73,72 @@ class _BuatPesananPageState extends State<BuatPesananPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Buat Pesanan',
-          style: TextStyle(
-              fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
-        ),
-        centerTitle: true,
-      ),
-      body: Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView(
-                children: [
-                  _buildKategori("SHOES TREATMENT", [
-                    "Quick clean (5 jam)",
-                    "Deep clean (3 hari)",
-                    "Leather care/perawatan sepatu kulit (3 hari)",
-                    "Kids shoes cleaning (2 hari)",
-                    "Women shoes (2 hari)",
-                    "Unyellowing midsole (4 hari)"
-                  ]),
-                  _buildKategori("AUGMENT", [
-                    "Cap cleaning (2 hari)",
-                    "Sandals cleaning (2 hari)"
-                  ]),
-                ],
-              ),
+      appBar: AppBar(title: Text("Buat Pesanan")),
+      body: layananGrouped.isEmpty
+          ? Center(child: CircularProgressIndicator())
+          : ListView(
+              children: layananGrouped.entries.map((entry) {
+                String nama = entry.key;
+                List<int> hargaOptions =
+                    entry.value.toSet().toList(); // Hilangkan harga duplikat
+
+                return ListTile(
+                  title: Text(nama),
+                  subtitle: DropdownButton<int>(
+                    value: hargaDipilih[nama],
+                    hint: Text("Pilih harga"),
+                    onChanged: (int? newValue) {
+                      setState(() {
+                        hargaDipilih[nama] = newValue;
+                        layananDipilih[nama] =
+                            1; // Perbaikan utama: otomatis pilih layanan saat harga dipilih
+                      });
+                    },
+                    items: hargaOptions.map((harga) {
+                      return DropdownMenuItem<int>(
+                        value: harga,
+                        child: Text("Rp. $harga"),
+                      );
+                    }).toList(),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.remove),
+                        onPressed: (layananDipilih[nama] ?? 0) > 0
+                            ? () => kurangiLayanan(nama)
+                            : null,
+                      ),
+                      Text("${layananDipilih[nama] ?? 0}"),
+                      IconButton(
+                        icon: Icon(Icons.add),
+                        onPressed: () => tambahLayanan(nama),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
             ),
-            _buildTotalHarga(),
-          ],
+      bottomNavigationBar: Container(
+        padding: EdgeInsets.all(16),
+        child: ElevatedButton(
+          onPressed: layananDipilih.isEmpty || hitungTotalHarga() == 0
+              ? null
+              : () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CheckoutPage(
+                          layananDipilih: layananDipilih,
+                          totalHarga: hitungTotalHarga(),
+                          layananList: layananList),
+                    ),
+                  );
+                },
+          child: Text("Checkout - Rp. ${hitungTotalHarga()}"),
         ),
       ),
-    );
-  }
-
-  Widget _buildKategori(String kategori, List<String> layanan) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        GestureDetector(
-          onTap: () {
-            setState(() {
-              kategoriTerbuka[kategori] = !(kategoriTerbuka[kategori] ?? true);
-            });
-          },
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                kategori,
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              Icon(
-                kategoriTerbuka[kategori]! ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right,
-                size: 24,
-              ),
-            ],
-          ),
-        ),
-        if (kategoriTerbuka[kategori]!)
-          Column(
-            children: layanan.map((layanan) => _buildLayanan(layanan)).toList(),
-          ),
-        SizedBox(height: 10),
-      ],
-    );
-  }
-
-  Widget _buildLayanan(String layanan) {
-    return Container(
-      padding: EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(layanan, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-              Text("Rp. ${hargaLayanan[layanan]}", style: TextStyle(fontSize: 12, color: Colors.grey)),
-            ],
-          ),
-          Row(
-            children: [
-              _buildButton(Icons.remove, () => kurangiLayanan(layanan)),
-              SizedBox(width: 10),
-              Text(
-                "${layananDipilih[layanan] ?? 0}",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(width: 10),
-              _buildButton(Icons.add, () => tambahLayanan(layanan)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildButton(IconData icon, VoidCallback onPressed) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        padding: EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: Colors.grey[300],
-          borderRadius: BorderRadius.circular(5),
-        ),
-        child: Icon(icon, size: 18),
-      ),
-    );
-  }
-
-  Widget _buildTotalHarga() {
-    return Column(
-      children: [
-        Divider(thickness: 1),
-        Padding(
-          padding: EdgeInsets.symmetric(vertical: 10),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text("Total", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              Text("Rp. ${hitungTotalHarga()}", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            ],
-          ),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            // Aksi Checkout
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.black,
-            padding: EdgeInsets.symmetric(vertical: 12, horizontal: 30),
-          ),
-          child: Text("Checkout", style: TextStyle(fontSize: 16, color: Colors.white)),
-        ),
-      ],
     );
   }
 }
