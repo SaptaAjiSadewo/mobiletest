@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:typed_data';
+import 'package:image_picker_web/image_picker_web.dart';
+import 'transaksi_berhasilPage.dart';
 
 class CheckoutPage extends StatefulWidget {
   final Map<String, int> layananDipilih;
@@ -8,7 +12,7 @@ class CheckoutPage extends StatefulWidget {
   CheckoutPage({
     required this.layananDipilih,
     required this.totalHarga,
-    required this.layananList, // Pastikan ada di konstruktor
+    required this.layananList,
   });
 
   @override
@@ -16,92 +20,85 @@ class CheckoutPage extends StatefulWidget {
 }
 
 class _CheckoutPageState extends State<CheckoutPage> {
+  final TextEditingController _namaController = TextEditingController();
+  final TextEditingController _teleponController = TextEditingController();
+  final TextEditingController _alamatController = TextEditingController();
+  final TextEditingController _catatanController = TextEditingController();
+
   String? _selectedPaymentMethod;
-  int _selectedDeliveryOption = 0; // 0: Antar Jemput, 1: Drop Off
-  TextEditingController _jarakController = TextEditingController();
-  int _biayaPengiriman = 0;
+  String _status = "pending";
+  DateTime _waktuPemesanan = DateTime.now();
+  double _biayaPengiriman = 10000; // Biaya pengiriman tetap
 
-  void _hitungBiayaPengiriman() {
-    setState(() {
-      double jarak = double.tryParse(_jarakController.text) ?? 0;
-      if (jarak > 0) {
-        _biayaPengiriman = (jarak <= 5) ? 1000 : 15000;
-      } else {
-        _biayaPengiriman = 0;
+  Uint8List? _buktiTransfer;
+  String? _buktiFileName;
+
+  final List<String> metodePembayaran = ["Bank Transfer", "E-Wallet", "COD"];
+
+  // Fungsi untuk memilih gambar dari galeri
+  Future<void> _pickImage() async {
+    Uint8List? bytes = await ImagePickerWeb.getImageAsBytes();
+    if (bytes != null) {
+      setState(() {
+        _buktiTransfer = bytes;
+        _buktiFileName = "bukti_transfer.png";
+      });
+    }
+  }
+
+  Future<void> submitCheckout() async {
+    try {
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('http://192.168.1.9:8000/api/pesanan'),
+      );
+
+      request.fields['nama'] = _namaController.text;
+      request.fields['no_telepon'] = _teleponController.text;
+      request.fields['alamat'] = _alamatController.text;
+      request.fields['total_pembayaran'] =
+          (_biayaPengiriman + widget.totalHarga).toString();
+      request.fields['metode_pembayaran'] = _selectedPaymentMethod!;
+      request.fields['layanan_dipesan'] = widget.layananDipilih.keys.join(', ');
+      request.fields['waktu_pemesanan'] = _waktuPemesanan.toIso8601String();
+      request.fields['status'] = _status;
+
+      if (_catatanController.text.isNotEmpty) {
+        request.fields['catatan'] = _catatanController.text;
       }
-    });
-  }
 
-  int _hitungTotalKeseluruhan() {
-    return widget.totalHarga + _biayaPengiriman;
-  }
+      // Tambah bukti transfer jika ada
+      if (_buktiTransfer != null && _buktiFileName != null) {
+        request.files.add(http.MultipartFile.fromBytes(
+          'bukti_transfer',
+          _buktiTransfer!,
+          filename: _buktiFileName,
+        ));
+      }
 
-  Widget _buildTextField(String label,
-      {bool isMultiline = false, TextEditingController? controller}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(fontWeight: FontWeight.bold)),
-        SizedBox(height: 5),
-        TextField(
-          controller: controller,
-          maxLines: isMultiline ? 3 : 1,
-          keyboardType:
-              label == "Jarak (km)" ? TextInputType.number : TextInputType.text,
-          decoration: InputDecoration(border: OutlineInputBorder()),
-          onChanged: (value) {
-            if (label == "Jarak (km)") {
-              _hitungBiayaPengiriman();
-            }
-          },
-        ),
-        SizedBox(height: 10),
-      ],
-    );
-  }
+      var response = await request.send();
 
-  Widget _buildOrderSummary() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("Detail Pesanan", style: TextStyle(fontWeight: FontWeight.bold)),
-        Divider(),
-        ...widget.layananDipilih.entries.map((entry) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("${entry.key} (x${entry.value})"),
-                Text(
-                    "Rp. ${entry.value * (widget.layananList.firstWhere((layanan) => layanan["nama"] == entry.key)["harga"] ?? 0)}",
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-              ],
-            ),
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Pesanan berhasil dikirim!")),
+        );
+        Future.delayed(Duration(seconds: 2), () {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => TransaksiBerhasilPage()),
           );
-        }).toList(),
-        Divider(),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text("Biaya Pengiriman",
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            Text("Rp. $_biayaPengiriman",
-                style: TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        Divider(),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text("Total Keseluruhan",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            Text("Rp. ${_hitungTotalKeseluruhan()}",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          ],
-        ),
-      ],
-    );
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Gagal mengirim pesanan, coba lagi!")),
+        );
+      }
+    } catch (e) {
+      print("Error: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Terjadi kesalahan, periksa koneksi Anda!")),
+      );
+    }
   }
 
   @override
@@ -113,85 +110,84 @@ class _CheckoutPageState extends State<CheckoutPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildOrderSummary(),
-            SizedBox(height: 20),
-            Text("Pilih Metode Pengiriman",
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            ToggleButtons(
-              borderRadius: BorderRadius.circular(8),
-              selectedColor: Colors.white,
-              color: Colors.black,
-              fillColor: Colors.black,
-              isSelected: [
-                _selectedDeliveryOption == 0,
-                _selectedDeliveryOption == 1
-              ],
-              onPressed: (int index) {
-                setState(() {
-                  _selectedDeliveryOption = index;
-                });
-              },
-              children: [
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Text("Antar Jemput"),
-                ),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Text("Drop Off di Outlet"),
-                ),
-              ],
+            TextField(
+              controller: _namaController,
+              decoration: InputDecoration(labelText: "Nama"),
             ),
-            SizedBox(height: 20),
-            _buildTextField("Nama"),
-            _buildTextField("Link URL Penjemputan"),
-            _buildTextField("Alamat"),
-            _buildTextField("Nomor Telepon/WhatsApp"),
-            _buildTextField("Jarak (km)", controller: _jarakController),
-            _buildTextField("Catatan", isMultiline: true),
+            TextField(
+              controller: _teleponController,
+              decoration: InputDecoration(labelText: "No. Telepon"),
+              keyboardType: TextInputType.phone,
+            ),
+            TextField(
+              controller: _alamatController,
+              decoration: InputDecoration(labelText: "Alamat"),
+            ),
+            TextField(
+              controller: _catatanController,
+              decoration: InputDecoration(labelText: "Catatan (Opsional)"),
+            ),
             SizedBox(height: 10),
-            Text("Upload Foto Sepatu",
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 5),
-            ElevatedButton(
-              onPressed: () {},
-              child: Text("Pilih File"),
-            ),
-            SizedBox(height: 20),
-            Text("Metode Pembayaran",
-                style: TextStyle(fontWeight: FontWeight.bold)),
+
+            // Dropdown Metode Pembayaran
             DropdownButtonFormField<String>(
               value: _selectedPaymentMethod,
+              decoration: InputDecoration(labelText: "Metode Pembayaran"),
+              items: metodePembayaran.map((String method) {
+                return DropdownMenuItem<String>(
+                  value: method,
+                  child: Text(method),
+                );
+              }).toList(),
               onChanged: (value) {
                 setState(() {
                   _selectedPaymentMethod = value;
                 });
               },
-              items: [
-                DropdownMenuItem(
-                    value: "Transfer Bank", child: Text("Transfer Bank")),
-                DropdownMenuItem(value: "E-Wallet", child: Text("E-Wallet")),
-                DropdownMenuItem(value: "COD", child: Text("COD")),
-              ],
-              decoration: InputDecoration(border: OutlineInputBorder()),
             ),
-            SizedBox(height: 30),
-            Center(
-              child: ElevatedButton(
-                onPressed: _selectedPaymentMethod == null
-                    ? null
-                    : () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Pembayaran Berhasil!")),
-                        );
-                        Navigator.pop(context);
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                ),
-                child: Text("Bayar Sekarang"),
-              ),
+
+            SizedBox(height: 10),
+            Text("Layanan yang dipilih:",
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            ...widget.layananDipilih.keys
+                .map((item) => Text("- $item"))
+                .toList(),
+            SizedBox(height: 10),
+
+            Text("Total Harga: Rp ${widget.totalHarga.toStringAsFixed(0)}"),
+            Text("Biaya Pengiriman: Rp $_biayaPengiriman"),
+            Text(
+              "Total Bayar: Rp ${(widget.totalHarga + _biayaPengiriman).toStringAsFixed(0)}",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+
+            SizedBox(height: 10),
+            Text("Bukti Transfer (Opsional):",
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            SizedBox(height: 5),
+
+            _buktiTransfer != null
+                ? Image.memory(_buktiTransfer!, height: 100)
+                : Text("Belum ada gambar"),
+            SizedBox(height: 5),
+
+            ElevatedButton(
+              onPressed: _pickImage,
+              child: Text("Unggah Bukti Transfer"),
+            ),
+
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                if (_selectedPaymentMethod == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Pilih metode pembayaran!")),
+                  );
+                  return;
+                }
+                submitCheckout();
+              },
+              child: Text("Konfirmasi Pesanan"),
             ),
           ],
         ),
