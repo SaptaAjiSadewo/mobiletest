@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_project_test/home_page.dart';
 import 'promosi_page.dart';
-import 'profile_page.dart'; // Tambahkan import untuk halaman profil
+import 'profile_page.dart';
 import 'pesanan_page.dart';
+import 'pesanansayapage.dart'; // pastikan path-nya sesuai
 
 class KuponDiskonPage extends StatefulWidget {
+  final String token;
+
+  KuponDiskonPage({required this.token}); // ✅ Tambahkan token ke konstruktor
+
   @override
   _KuponDiskonPageState createState() => _KuponDiskonPageState();
 }
@@ -27,15 +32,28 @@ class _KuponDiskonPageState extends State<KuponDiskonPage>
 
   void _onItemTapped(int index) {
     if (index == 0) {
-      // Kembali ke Home tanpa duplikasi
       Navigator.pushReplacement(
-          context, MaterialPageRoute(builder: (context) => HomePage(name: "")));
+        context,
+        MaterialPageRoute(builder: (context) => HomePage(token: widget.token)),
+      );
     } else if (index == 1) {
-      // Tetap di halaman ini (Kupon Diskon)
+      // Halaman Kupon saat ini, tidak perlu navigasi
     } else if (index == 2) {
-      // ✅ Pindah ke halaman Keranjang (PesananPage)
       Navigator.push(
-          context, MaterialPageRoute(builder: (context) => BuatPesananPage()));
+        context,
+        MaterialPageRoute(builder: (context) => BuatPesananPage()),
+      );
+    } else if (index == 3) {
+      Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => PesananSayaPage())); // 🆕 Ini dia!
+    } else if (index == 4) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (context) => ProfilePage(token: widget.token)),
+      );
     }
   }
 
@@ -83,7 +101,9 @@ class _KuponDiskonPageState extends State<KuponDiskonPage>
               icon: Icon(Icons.local_offer), label: "Kupon"),
           BottomNavigationBarItem(
               icon: Icon(Icons.shopping_cart), label: "Keranjang"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profil"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.receipt_long), label: "Pesanan"),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
         ],
       ),
     );
@@ -136,16 +156,15 @@ class _KuponDiskonPageState extends State<KuponDiskonPage>
                     style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: Colors.blue)),
+                        color: Colors.black)),
                 ElevatedButton(
                   onPressed: () {
-                    // Fitur salin kode voucher
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text("Kode $code disalin")),
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
+                    backgroundColor: Colors.black,
                     foregroundColor: Colors.white,
                     padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
