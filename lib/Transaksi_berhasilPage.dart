@@ -14,7 +14,7 @@ class TransaksiBerhasilPage extends StatelessWidget {
             Text("Transaksi Berhasil!", 
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             SizedBox(height: 10),
-            Text("Terima kasih sudah berbelanja."),
+            Text("Terima kasih sudah mempercayai layanan kami."),
             SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
