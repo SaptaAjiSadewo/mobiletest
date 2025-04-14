@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_project_test/pesanan_page.dart';
 import 'kupondiskon_page.dart';
+import 'profile_page.dart'; // pastikan path-nya sesuai
+import 'pesanansayapage.dart'; // pastikan path-nya sesuai
 
 class HomePage extends StatefulWidget {
-  final String name;
+  final String token;
 
-  const HomePage({super.key, required this.name});
+  const HomePage({super.key, required this.token});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -34,11 +36,26 @@ class _HomePageState extends State<HomePage> {
       // ✅ Tetap di halaman Home
     } else if (index == 1) {
       Navigator.push(
-          context, MaterialPageRoute(builder: (context) => KuponDiskonPage()));
+          context,
+          MaterialPageRoute(
+              builder: (context) => KuponDiskonPage(token: widget.token)));
     } else if (index == 2) {
       // ✅ Pindah ke halaman Keranjang (PesananPage)
       Navigator.push(
           context, MaterialPageRoute(builder: (context) => BuatPesananPage()));
+    } else if (index == 3) {
+      Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => PesananSayaPage())); // 🆕 Ini dia!
+    } else if (index == 4) {
+      // ✅ Navigasi ke halaman profil
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ProfilePage(token: widget.token),
+        ),
+      );
     }
   }
 
@@ -72,7 +89,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    String name = widget.name; // Tetap menggunakan variabel ini untuk header
+    String name = widget.token; // Tetap menggunakan variabel ini untuk header
 
     return Scaffold(
       appBar: AppBar(
@@ -120,6 +137,26 @@ class _HomePageState extends State<HomePage> {
               ),
               SizedBox(height: 20),
 
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => PesananSayaPage()),
+                  );
+                },
+                icon: Icon(Icons.receipt_long),
+                label: Text("Pesanan Saya"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+
+              SizedBox(height: 20),
+
               // Menu Kupon & Promosi
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -160,6 +197,8 @@ class _HomePageState extends State<HomePage> {
               icon: Icon(Icons.local_offer), label: "Kupon"),
           BottomNavigationBarItem(
               icon: Icon(Icons.shopping_cart), label: "Keranjang"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.receipt_long), label: "Pesanan"),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profil"),
         ],
       ),
