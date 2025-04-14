@@ -24,18 +24,20 @@ class _CheckoutPageState extends State<CheckoutPage> {
   final TextEditingController _teleponController = TextEditingController();
   final TextEditingController _alamatController = TextEditingController();
   final TextEditingController _catatanController = TextEditingController();
+  final TextEditingController _jarakController = TextEditingController();
 
   String? _selectedPaymentMethod;
+  String? _selectedDeliveryType;
   String _status = "pending";
   DateTime _waktuPemesanan = DateTime.now();
-  double _biayaPengiriman = 10000; // Biaya pengiriman tetap
+  double _biayaPengiriman = 0;
 
   Uint8List? _buktiTransfer;
   String? _buktiFileName;
 
   final List<String> metodePembayaran = ["Bank Transfer", "E-Wallet", "COD"];
+  final List<String> jenisPengiriman = ["Drop Off", "Pickup"];
 
-  // Fungsi untuk memilih gambar dari galeri
   Future<void> _pickImage() async {
     Uint8List? bytes = await ImagePickerWeb.getImageAsBytes();
     if (bytes != null) {
@@ -46,28 +48,60 @@ class _CheckoutPageState extends State<CheckoutPage> {
     }
   }
 
+  void _hitungBiayaPengiriman() {
+    if (_selectedDeliveryType == "Drop Off") {
+      _biayaPengiriman = 0;
+    } else if (_selectedDeliveryType == "Pickup") {
+      String jarakText = _jarakController.text.trim();
+
+      if (jarakText.isEmpty) {
+        _biayaPengiriman = 0;
+        return;
+      }
+
+      double? jarak = double.tryParse(jarakText);
+
+      if (jarak != null && jarak >= 0) {
+        if (jarak <= 3) {
+          _biayaPengiriman = 5000;
+        } else if (jarak <= 5) {
+          _biayaPengiriman = 10000;
+        } else {
+          _biayaPengiriman = 15000 + ((jarak - 5) * 1000);
+        }
+      } else {
+        _biayaPengiriman = 0; // input invalid
+      }
+    } else {
+      _biayaPengiriman = 0;
+    }
+  }
+
   Future<void> submitCheckout() async {
+    _hitungBiayaPengiriman();
+
     try {
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('http://192.168.1.9:8000/api/pesanan'),
+        Uri.parse('http://192.168.1.13:8000/api/pesanan'),
       );
 
       request.fields['nama'] = _namaController.text;
       request.fields['no_telepon'] = _teleponController.text;
       request.fields['alamat'] = _alamatController.text;
       request.fields['total_pembayaran'] =
-          (_biayaPengiriman + widget.totalHarga).toString();
+          (widget.totalHarga + _biayaPengiriman).toString();
       request.fields['metode_pembayaran'] = _selectedPaymentMethod!;
       request.fields['layanan_dipesan'] = widget.layananDipilih.keys.join(', ');
       request.fields['waktu_pemesanan'] = _waktuPemesanan.toIso8601String();
       request.fields['status'] = _status;
+      request.fields['jenis_pengiriman'] = _selectedDeliveryType ?? "";
+      request.fields['jarak'] = _jarakController.text; // <-- Tambahkan ini
 
       if (_catatanController.text.isNotEmpty) {
         request.fields['catatan'] = _catatanController.text;
       }
 
-      // Tambah bukti transfer jika ada
       if (_buktiTransfer != null && _buktiFileName != null) {
         request.files.add(http.MultipartFile.fromBytes(
           'bukti_transfer',
@@ -103,41 +137,39 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   @override
   Widget build(BuildContext context) {
+    _hitungBiayaPengiriman();
+
     return Scaffold(
       appBar: AppBar(title: Text("Checkout")),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
-              controller: _namaController,
-              decoration: InputDecoration(labelText: "Nama"),
+            _buildTextField(_namaController, "Nama"),
+            _buildTextField(_teleponController, "No. Telepon",
+                type: TextInputType.phone),
+            _buildTextField(_alamatController, "Alamat"),
+            _buildTextField(_catatanController, "Catatan (Opsional)"),
+            DropdownButtonFormField<String>(
+              value: _selectedDeliveryType,
+              decoration: InputDecoration(labelText: "Jenis Pengiriman"),
+              items: jenisPengiriman.map((jenis) {
+                return DropdownMenuItem(value: jenis, child: Text(jenis));
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedDeliveryType = value;
+                });
+              },
             ),
-            TextField(
-              controller: _teleponController,
-              decoration: InputDecoration(labelText: "No. Telepon"),
-              keyboardType: TextInputType.phone,
-            ),
-            TextField(
-              controller: _alamatController,
-              decoration: InputDecoration(labelText: "Alamat"),
-            ),
-            TextField(
-              controller: _catatanController,
-              decoration: InputDecoration(labelText: "Catatan (Opsional)"),
-            ),
-            SizedBox(height: 10),
-
-            // Dropdown Metode Pembayaran
+            if (_selectedDeliveryType == "Pickup")
+              _buildTextField(_jarakController, "Jarak ke lokasi (km)",
+                  type: TextInputType.number),
             DropdownButtonFormField<String>(
               value: _selectedPaymentMethod,
               decoration: InputDecoration(labelText: "Metode Pembayaran"),
-              items: metodePembayaran.map((String method) {
-                return DropdownMenuItem<String>(
-                  value: method,
-                  child: Text(method),
-                );
+              items: metodePembayaran.map((method) {
+                return DropdownMenuItem(value: method, child: Text(method));
               }).toList(),
               onChanged: (value) {
                 setState(() {
@@ -145,43 +177,32 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 });
               },
             ),
-
-            SizedBox(height: 10),
-            Text("Layanan yang dipilih:",
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            ...widget.layananDipilih.keys
-                .map((item) => Text("- $item"))
-                .toList(),
-            SizedBox(height: 10),
-
-            Text("Total Harga: Rp ${widget.totalHarga.toStringAsFixed(0)}"),
-            Text("Biaya Pengiriman: Rp $_biayaPengiriman"),
+            SizedBox(height: 20),
+            _buildLayananList(),
+            Divider(thickness: 1),
             Text(
               "Total Bayar: Rp ${(widget.totalHarga + _biayaPengiriman).toStringAsFixed(0)}",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-
-            SizedBox(height: 10),
+            SizedBox(height: 20),
             Text("Bukti Transfer (Opsional):",
                 style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 5),
-
             _buktiTransfer != null
                 ? Image.memory(_buktiTransfer!, height: 100)
                 : Text("Belum ada gambar"),
-            SizedBox(height: 5),
-
             ElevatedButton(
               onPressed: _pickImage,
               child: Text("Unggah Bukti Transfer"),
             ),
-
             SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
-                if (_selectedPaymentMethod == null) {
+                if (_selectedPaymentMethod == null ||
+                    _selectedDeliveryType == null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Pilih metode pembayaran!")),
+                    SnackBar(
+                        content: Text(
+                            "Pilih metode pembayaran dan jenis pengiriman!")),
                   );
                   return;
                 }
@@ -192,6 +213,32 @@ class _CheckoutPageState extends State<CheckoutPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTextField(TextEditingController controller, String label,
+      {TextInputType type = TextInputType.text}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
+        controller: controller,
+        keyboardType: type,
+        decoration: InputDecoration(
+          labelText: label,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLayananList() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("Layanan yang dipilih:",
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        ...widget.layananDipilih.keys.map((item) => Text("- $item")).toList(),
+      ],
     );
   }
 }
