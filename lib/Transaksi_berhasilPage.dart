@@ -20,7 +20,7 @@ class TransaksiBerhasilPage extends StatelessWidget {
               onPressed: () {
                 Navigator.pop(context); // Kembali ke halaman sebelumnya
               },
-              child: Text("Kembali ke Beranda"),
+              child: Text("Kembali ke layanan kami"),
             ),
           ],
         ),
